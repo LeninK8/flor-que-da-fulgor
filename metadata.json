@@ -1,0 +1,6 @@
+{
+  "name": "MAGIC_FLOWER_3D",
+  "description": "Flor dorada bioluminiscente en noche de linternas flotantes, 10 luciérnagas, cámara orbital cinematográfica y 'Veo en ti la luz' - Feliz 21 de septiembre",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
