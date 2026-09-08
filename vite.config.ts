@@ -5,6 +5,7 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return {
+    base: '/flor-que-da-fulgor/',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
