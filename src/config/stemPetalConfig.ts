@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { PETAL_CONFIG } from './petalConfig';
+import { PetalConfig, PETAL_CONFIG } from './petalConfig';
 
 /**
  * CONFIGURACIÓN DE LA INSTANCIA ÚNICA: TALLO + 1 PETAL MASTER
@@ -29,8 +29,8 @@ export const STEM_PETAL_CONFIG: StemPetalConfig = {
   // Tangente del tallo en la cúspide (rotación base alineada con la dirección de crecimiento)
   petalRotation: [0.133, 0.0, 0.091],
 
-  // Inclinación hacia afuera en arco ∩ que continúa la curvatura biológica
-  petalTilt: 1.15,
+  // Inclinación hacia afuera en arco que continúa la curvatura biológica (-1.36 rad)
+  petalTilt: -1.36,
 
   // Balanceo lateral (roll)
   petalRoll: 0.0,
@@ -43,21 +43,29 @@ export const STEM_PETAL_CONFIG: StemPetalConfig = {
  * Calcula la transformación final (posición, rotación Euler y escala)
  * anclando el pétalo exactamente en su base de inserción para que no flote ni se desplace al rotar.
  */
-export function getStemPetalTransform(config: StemPetalConfig) {
-  const { petalPosition, petalRotation, petalTilt, petalRoll, petalScale } = config;
+export function getStemPetalTransform(config: StemPetalConfig, petalConfig: PetalConfig = PETAL_CONFIG) {
+  const { petalPosition, petalRotation, petalScale } = config;
 
-  // Rotación combinada: tangente base + inclinación en arco (pitch) + volteo vertical (Math.PI) + balanceo (roll)
+  // Inclinación / Caída (pitch): si petalConfig define tiltAngle, se usa para permitir el giro libre (erguido <-> paraguas hacia abajo)
+  const pitch = petalConfig.tiltAngle !== undefined ? petalConfig.tiltAngle : config.petalTilt;
+  const yaw = petalConfig.azimuthAngle !== undefined ? petalConfig.azimuthAngle : 0;
+  const roll = petalConfig.rollAngle !== undefined ? petalConfig.rollAngle : config.petalRoll;
+
+  // Rotación combinada:
+  // - petalRotation[0] + pitch: tangente base + inclinación en arco (0 = erguido, ~2.35 = paraguas hacia abajo)
+  // - petalRotation[1] + Math.PI + yaw: orientación azimutal alrededor del tallo (360° libre)
+  // - petalRotation[2] + roll: balanceo / rotación axial sobre sí mismo
   const euler = new THREE.Euler(
-    petalRotation[0] + petalTilt,
-    petalRotation[1] + Math.PI,
-    petalRotation[2] + petalRoll,
+    petalRotation[0] + pitch,
+    petalRotation[1] + Math.PI + yaw,
+    petalRotation[2] + roll,
     'YXZ'
   );
 
   // Desplazamiento exacto para situar la base del pétalo (u = 0, v = 0.5) en el pivote (0, 0, 0)
-  const curveSign = PETAL_CONFIG.invertCurvature ? -1 : 1;
-  const baseOffsetZ = (0.4 * PETAL_CONFIG.cupTransverse + 1.6 * PETAL_CONFIG.veinRelief) * curveSign;
-  const baseYOffset = 0.46 * PETAL_CONFIG.length;
+  const curveSign = petalConfig.invertCurvature ? -1 : 1;
+  const baseOffsetZ = (0.4 * petalConfig.cupTransverse + 1.6 * petalConfig.veinRelief) * curveSign;
+  const baseYOffset = 0.46 * petalConfig.length;
 
   return {
     position: petalPosition,

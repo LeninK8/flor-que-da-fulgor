@@ -21,7 +21,7 @@ import { FOLIAGE_CONFIG } from '../config/foliageConfig';
 import { getLeafAttachmentTransform } from '../config/leafConfig';
 import { PetalConfig } from '../config/petalConfig';
 import { StemPetalConfig } from '../config/stemPetalConfig';
-import { FLOWER_CONFIG, FlowerConfig } from '../config/flowerConfig';
+import { FLOWER_CONFIG, FlowerConfig, IndividualPetalOverride } from '../config/flowerConfig';
 
 export type CameraViewPreset =
   | 'front'
@@ -32,6 +32,7 @@ export type CameraViewPreset =
   | 'base'
   | 'stamens'
   | 'top'
+  | 'bottom'
   | 'lanterns'
   | 'overview';
 
@@ -50,11 +51,16 @@ interface SceneProps {
   cameraPreset?: CameraViewPreset;
   foliageConfigOverride?: Partial<typeof FOLIAGE_CONFIG>;
   petalConfigOverride?: Partial<PetalConfig>;
+  individualPetalOverrides?: Record<number, IndividualPetalOverride>;
+  selectedPetalIndex?: number | null;
   stemPetalConfigOverride?: Partial<StemPetalConfig>;
   flowerConfigOverride?: Partial<FlowerConfig>;
   isDarkStudio?: boolean;
   isNight?: boolean;
   showLanterns?: boolean;
+  wireframe?: boolean;
+  showSparkles?: boolean;
+  showStemContext?: boolean; // Muestra el tallo y el bulto de tierra (isla) como base de referencia para el pétalo
 }
 
 export function Scene({
@@ -62,11 +68,16 @@ export function Scene({
   cameraPreset = 'perspective',
   foliageConfigOverride,
   petalConfigOverride,
+  individualPetalOverrides,
+  selectedPetalIndex,
   stemPetalConfigOverride,
   flowerConfigOverride,
   isDarkStudio = true,
   isNight = true,
   showLanterns = true,
+  wireframe = false,
+  showSparkles = true,
+  showStemContext = true,
 }: SceneProps) {
   const env =
     SCENE_CONFIG.mode === 'DAY' ? SCENE_CONFIG.day : SCENE_CONFIG.night;
@@ -193,34 +204,78 @@ export function Scene({
     if (mode === 'isolated-petal') {
       cameraRef.current.up.set(0, 1, 0);
 
-      if (cameraPreset === 'front') {
-        // VISTA FRONTAL de la ficha técnica
-        controlsRef.current.target.set(0, 0, 0);
-        cameraRef.current.position.set(0, 0, 1.65);
-      } else if (cameraPreset === 'side') {
-        // VISTA LATERAL de la ficha técnica (muestra perfil en S y gancho)
-        controlsRef.current.target.set(0, 0, 0);
-        cameraRef.current.position.set(1.65, 0, 0);
-      } else if (cameraPreset === 'back') {
-        // VISTA POSTERIOR de la ficha técnica (envés y quilla dorsal)
-        controlsRef.current.target.set(0, 0, 0);
-        cameraRef.current.position.set(0, 0, -1.65);
-      } else if (cameraPreset === 'tip') {
-        // DETALLE DE LA FORMA: Borde ondulado y curvado del gancho terminal
-        controlsRef.current.target.set(-0.08, 0.52, -0.08 * curveSign);
-        cameraRef.current.position.set(0.2, 0.65, 0.6 * curveSign);
-      } else if (cameraPreset === 'base') {
-        // DETALLE DE LA FORMA: Base del pétalo y venas magenta
-        controlsRef.current.target.set(0, -0.42, 0.05 * curveSign);
-        cameraRef.current.position.set(0, -0.32, 0.65 * curveSign);
-      } else if (cameraPreset === 'perspective') {
-        // Perspectiva 3/4 tridimensional
-        controlsRef.current.target.set(0, 0, 0);
-        cameraRef.current.position.set(0.95, 0.38, 1.1);
-      } else if (cameraPreset === 'top') {
-        cameraRef.current.up.set(0, 0, -1);
-        controlsRef.current.target.set(0, 0, 0);
-        cameraRef.current.position.set(0, 1.65, 0);
+      if (showStemContext) {
+        // La cúspide del tallo y el anclaje del pétalo están en [0.231, 3.012, 0.042]
+        // y el cuerpo del pétalo asciende hacia y ≈ 3.4 - 3.8
+        const anchorX = 0.231;
+        const anchorY = 3.35;
+        const anchorZ = 0.042;
+
+        if (cameraPreset === 'front') {
+          controlsRef.current.target.set(anchorX, anchorY, anchorZ);
+          cameraRef.current.position.set(anchorX, anchorY, anchorZ + 2.2);
+        } else if (cameraPreset === 'side') {
+          controlsRef.current.target.set(anchorX, anchorY, anchorZ);
+          cameraRef.current.position.set(anchorX + 2.4, anchorY, anchorZ);
+        } else if (cameraPreset === 'back') {
+          controlsRef.current.target.set(anchorX, anchorY, anchorZ);
+          cameraRef.current.position.set(anchorX, anchorY, anchorZ - 2.2);
+        } else if (cameraPreset === 'tip') {
+          // Enfoca la punta del pétalo sobre el tallo
+          controlsRef.current.target.set(anchorX - 0.1, anchorY + 0.35, anchorZ);
+          cameraRef.current.position.set(anchorX + 0.3, anchorY + 0.55, anchorZ + 0.8);
+        } else if (cameraPreset === 'base') {
+          // Enfoca el anclaje exacto del pétalo al tallo y la base
+          controlsRef.current.target.set(anchorX, 3.05, anchorZ);
+          cameraRef.current.position.set(anchorX + 0.5, 3.15, anchorZ + 0.9);
+        } else if (cameraPreset === 'overview') {
+          // Vista completa que abarca el montículo de tierra, el tallo y el pétalo
+          controlsRef.current.target.set(0.12, 1.8, 0.0);
+          cameraRef.current.position.set(anchorX, 2.4, 5.4);
+        } else if (cameraPreset === 'top') {
+          cameraRef.current.up.set(0, 0, -1);
+          controlsRef.current.target.set(anchorX, anchorY, anchorZ);
+          cameraRef.current.position.set(anchorX, anchorY + 2.4, anchorZ);
+        } else {
+          // Perspectiva 3D natural enfocando pétalo, cúspide y tallo
+          controlsRef.current.target.set(anchorX, anchorY, anchorZ);
+          cameraRef.current.position.set(anchorX + 1.5, anchorY + 0.6, anchorZ + 1.8);
+        }
+      } else {
+        if (cameraPreset === 'front') {
+          // VISTA FRONTAL de la ficha técnica
+          controlsRef.current.target.set(0, 0, 0);
+          cameraRef.current.position.set(0, 0, 1.65);
+        } else if (cameraPreset === 'side') {
+          // VISTA LATERAL de la ficha técnica (muestra perfil en S y gancho)
+          controlsRef.current.target.set(0, 0, 0);
+          cameraRef.current.position.set(1.65, 0, 0);
+        } else if (cameraPreset === 'back') {
+          // VISTA POSTERIOR de la ficha técnica (envés y quilla dorsal)
+          controlsRef.current.target.set(0, 0, 0);
+          cameraRef.current.position.set(0, 0, -1.65);
+        } else if (cameraPreset === 'tip') {
+          // DETALLE DE LA FORMA: Borde ondulado y curvado del gancho terminal
+          controlsRef.current.target.set(-0.08, 0.52, -0.08 * curveSign);
+          cameraRef.current.position.set(0.2, 0.65, 0.6 * curveSign);
+        } else if (cameraPreset === 'base') {
+          // DETALLE DE LA FORMA: Base del pétalo y venas magenta
+          controlsRef.current.target.set(0, -0.42, 0.05 * curveSign);
+          cameraRef.current.position.set(0, -0.32, 0.65 * curveSign);
+        } else if (cameraPreset === 'perspective') {
+          // Perspectiva 3/4 tridimensional
+          controlsRef.current.target.set(0, 0, 0);
+          cameraRef.current.position.set(0.95, 0.38, 1.1);
+        } else if (cameraPreset === 'top') {
+          cameraRef.current.up.set(0, 0, -1);
+          controlsRef.current.target.set(0, 0, 0);
+          cameraRef.current.position.set(0, 1.65, 0);
+        } else if (cameraPreset === 'bottom') {
+          // VISTA CENITAL INFERIOR (desde abajo hacia arriba)
+          cameraRef.current.up.set(0, 0, 1);
+          controlsRef.current.target.set(0, 0, 0);
+          cameraRef.current.position.set(0, -1.65, 0);
+        }
       }
     } else if (
       mode === 'flower' ||
@@ -281,12 +336,13 @@ export function Scene({
         makeDefault
         enableDamping
         dampingFactor={0.06}
-        enablePan={false}
+        enablePan={mode === 'isolated-petal'}
         maxDistance={25}
-        minDistance={1.2}
-        maxPolarAngle={Math.PI / 2 - 0.03}
-        target={[0.231, 3.25, 0.042]}
-        autoRotate={isAutoRotating}
+        minDistance={mode === 'isolated-petal' ? 0.15 : 1.2}
+        minPolarAngle={mode === 'isolated-petal' && !showStemContext ? 0 : 0.05}
+        maxPolarAngle={mode === 'isolated-petal' ? (showStemContext ? Math.PI : Math.PI) : Math.PI / 2 - 0.03}
+        target={mode === 'isolated-petal' ? (showStemContext ? [0.231, 3.35, 0.042] : [0, 0, 0]) : [0.231, 3.25, 0.042]}
+        autoRotate={mode === 'isolated-petal' ? false : isAutoRotating}
         autoRotateSpeed={0.75}
         onStart={handleControlsStart}
         onEnd={handleControlsEnd}
@@ -297,35 +353,44 @@ export function Scene({
         /* Iluminación de estudio oscuro especializada para bioluminiscencia y SSS */
         <group name="bioluminescent-studio-lights">
           {/* Luz ambiental sutil índigo */}
-          <ambientLight color="#1e1b4b" intensity={0.4} />
+          <ambientLight color="#1e1b4b" intensity={showStemContext ? 0.65 : 0.4} />
 
           {/* Luz clave frontal suave para revelar volumen de copa y acanaladuras */}
           <directionalLight
-            position={[1.5, 2.0, 3.2]}
+            position={showStemContext ? [2.5, 5.0, 4.2] : [1.5, 2.0, 3.2]}
             color="#fffbeb"
-            intensity={1.2}
+            intensity={1.3}
           />
 
           {/* Luz de contraluz / Rim Light cálida para resaltar el gancho apical y bordes */}
           <directionalLight
-            position={[-2.6, 2.2, -2.6]}
+            position={showStemContext ? [-3.6, 5.2, -3.6] : [-2.6, 2.2, -2.6]}
             color="#f59e0b"
             intensity={3.2}
           />
 
           {/* Luz de relleno posterior para translucidez (SSS) */}
           <directionalLight
-            position={[0.2, 0.5, -3.0]}
+            position={showStemContext ? [0.2, 3.5, -3.0] : [0.2, 0.5, -3.0]}
             color="#ea580c"
             intensity={2.0}
           />
 
-          {/* Luz de acento púrpura para la base */}
+          {/* Luz de acento púrpura para la base / caliz */}
           <directionalLight
-            position={[2.0, -2.0, 1.2]}
+            position={showStemContext ? [2.0, 1.0, 1.2] : [2.0, -2.0, 1.2]}
             color="#c026d3"
             intensity={2.4}
           />
+
+          {/* Luz sutil para iluminar la isla / bulto de tierra */}
+          {showStemContext && (
+            <directionalLight
+              position={[-4, 3, 5]}
+              color="#38bdf8"
+              intensity={0.4}
+            />
+          )}
         </group>
       ) : isNight ? (
         /* Iluminación mágica nocturna inspirada en Tangled / Enredados */
@@ -406,7 +471,12 @@ export function Scene({
           <Stem />
           <BasalFoliage />
           <PlantFoliageSystem config={foliageConfigOverride} />
-          <FlowerPetalSystem config={mergedFlowerConfig} />
+          <FlowerPetalSystem
+            config={mergedFlowerConfig}
+            petalConfig={petalConfigOverride}
+            individualOverrides={individualPetalOverrides}
+            selectedPetalIndex={selectedPetalIndex}
+          />
           {showLanterns && <FloatingLanterns />}
           <Fireflies />
         </group>
@@ -418,13 +488,46 @@ export function Scene({
           <Stem />
           <BasalFoliage />
           <PlantFoliageSystem config={foliageConfigOverride} />
-          <FlowerPetalSystem config={mergedFlowerConfig} />
+          <FlowerPetalSystem
+            config={mergedFlowerConfig}
+            petalConfig={petalConfigOverride}
+            individualOverrides={individualPetalOverrides}
+            selectedPetalIndex={selectedPetalIndex}
+          />
           {showLanterns && <FloatingLanterns />}
           <Fireflies />
         </group>
       ) : mode === 'isolated-petal' ? (
         <group name="isolated-petal-stage">
-          <Petal config={petalConfigOverride} showSparkles={true} />
+          {showStemContext ? (
+            <>
+              {/* Entorno base: agua, bulto de tierra (isla) y tallo para referencia espacial del anclaje */}
+              <Water />
+              <Island />
+              <Grass />
+              <Stem />
+              <StemPetalInstance
+                config={stemPetalConfigOverride}
+                petalConfig={petalConfigOverride}
+                wireframe={wireframe}
+                showSparkles={showSparkles}
+              />
+            </>
+          ) : (
+            <group
+              rotation={[
+                (petalConfigOverride?.tiltAngle !== undefined ? petalConfigOverride.tiltAngle - 1.15 : 0),
+                petalConfigOverride?.azimuthAngle ?? 0,
+                petalConfigOverride?.rollAngle ?? 0,
+              ]}
+            >
+              <Petal
+                config={petalConfigOverride}
+                showSparkles={showSparkles}
+                wireframe={wireframe}
+              />
+            </group>
+          )}
         </group>
       ) : mode === 'stem-petal' ? (
         <group name="stem-single-petal-stage">
@@ -432,7 +535,12 @@ export function Scene({
           <Island />
           <Grass />
           <Stem />
-          <StemPetalInstance config={stemPetalConfigOverride} />
+          <StemPetalInstance
+            config={stemPetalConfigOverride}
+            petalConfig={petalConfigOverride}
+            wireframe={wireframe}
+            showSparkles={showSparkles}
+          />
         </group>
       ) : mode === 'stem-petal-foliage' ? (
         <group name="stem-petal-full-stage">

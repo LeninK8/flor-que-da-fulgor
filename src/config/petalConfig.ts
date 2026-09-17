@@ -28,31 +28,73 @@ export interface PetalConfig {
     width: number;
   };
   invertCurvature?: boolean; // Inversión de curvatura para pancita salida: ")" en lugar de "("
+
+  // Parámetros de enrollado apical (punta del pétalo)
+  tipRollTurns?: number; // Vueltas completas o fraccionales de giro (0 = sin rollo, 0.5 = medio giro, 1.0 = vuelta completa, 2.0 = espiral)
+  tipRollStart?: number; // Posición longitudinal u donde comienza el enrollado (0.60 a 0.95)
+  tipRollDirection?: number; // -1 = Hacia abajo/atrás (curva floral descendente), 1 = Hacia arriba/adentro
+  tipRollRadius?: number; // Radio de holgura / apriete del enrollado
+  tipRollTwist?: number; // Torsión lateral orgánica del rollo
+  outerDescentMult?: number; // Factor de caída vertical hacia el exterior
+
+  // Personalización de color y apariencia PBR
+  baseColor?: string; // Color de inserción basal (púrpura / magenta)
+  midColor?: string; // Color del cuerpo central (dorado / amarillo)
+  tipColor?: string; // Color de la punta / borde (ámbar / naranja cálido)
+  veinGlowColor?: string; // Color de emisión bioluminiscente de las venas
+  emissiveIntensity?: number; // Intensidad del brillo bioluminiscente (0 a 4)
+  roughness?: number; // Rugosidad del material (0.05 sedoso/vítreo a 0.8 mate)
+  transmission?: number; // Translucidez orgánica / subsurface scattering (0 a 0.6)
+  clearcoat?: number; // Capa de barniz brillante / rocío húmedo (0 a 1)
+
+  // Orientación y giro libre del pétalo (inclinación en paraguas, azimut 360° y balanceo)
+  tiltAngle?: number; // Inclinación en radianes (0 = erguido arriba, 1.57 = horizontal, ~2.35 = paraguas hacia abajo, 3.14 = péndulo)
+  azimuthAngle?: number; // Giro horizontal / azimutal 360° alrededor del tallo (0 a 2π rad)
+  rollAngle?: number; // Balanceo axial sobre el nervio central (-π a +π rad)
+
+  // Anchura basal (nacimiento del pétalo para rellenar la corona floral sin huecos centrales)
+  baseWidthRatio?: number; // Proporción de anchura en el nacimiento del pétalo (0.10 estrecho a 0.35 abundante)
 }
 
 export const PETAL_CONFIG: PetalConfig = {
-  // Calibración calibrada por el usuario:
-  length: 1.60,
-  width: 0.75,
-  // Grosor variable tridimensional (0.5 – 2 cm a escala)
+  // Calibración exacta aprobada y definitiva por el usuario:
+  length: 1.84,
+  width: 0.92,
+  baseWidthRatio: 0.19,
+  curvatureS: 0.48,
+  outerDescentMult: 1.3,
+  cupTransverse: 0.18,
+  tipRollTurns: 0.7,
+  tipRollStart: 0.77,
+  tipRollDirection: -1,
+  tipRollTwist: 0.03,
+  tipHookIntensity: 0.1,
+  tipHookAngle: 0.88,
+  edgeRuffles: 0.028,
+  veinRelief: 0.022,
   thicknessBase: 0.052,
   thicknessEdge: 0.014,
-  // Curvatura longitudinal en 'S'
-  curvatureS: 0.50,
-  // Curvatura transversal en copa cóncava
-  cupTransverse: 0.16,
-  // Gancho recurvado terminal ("Borde ondulado y curvado" en la punta)
-  tipHookIntensity: 0.10,
-  tipHookAngle: 0.88,
-  // Ondulaciones orgánicas en los márgenes
-  edgeRuffles: 0.032,
-  // Relieve de venas y acanaladuras
-  veinRelief: 0.024,
+
   // Subdivisión de malla densa para deformación continua
   segments: {
     length: 150,
     width: 64,
   },
-  // Revertido a ")" con la pancita abombada hacia afuera:
-  invertCurvature: true,
+  invertCurvature: false,
+  tipRollRadius: 0.12,
+
+  // Color y apariencia PBR calibrados por el usuario
+  baseColor: '#56095d',
+  midColor: '#eea205',
+  tipColor: '#ffa500',
+  veinGlowColor: '#eea505',
+  emissiveIntensity: 2.95,
+  roughness: 0.34,
+  transmission: 0.18,
+  clearcoat: 0.3,
+
+  // Orientación y caída aprobada por el usuario
+  tiltAngle: -1.08,
+  azimuthAngle: 0.22,
+  rollAngle: -0.14,
 };

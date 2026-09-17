@@ -21,9 +21,24 @@ export interface PetalTextureSet {
   backColorMap: THREE.CanvasTexture;
 }
 
-export function generatePetalTextures(resolution = 1024): PetalTextureSet {
+export interface PetalTextureOptions {
+  baseColor?: string;
+  midColor?: string;
+  tipColor?: string;
+  veinGlowColor?: string;
+}
+
+export function generatePetalTextures(
+  resolution = 1024,
+  options?: PetalTextureOptions
+): PetalTextureSet {
   const width = resolution;
   const height = resolution * 2; // Ratio 1:2 para mayor fidelidad a lo largo del pétalo
+
+  const optBaseColor = options?.baseColor || '#a21caf';
+  const optMidColor = options?.midColor || '#facc15';
+  const optTipColor = options?.tipColor || '#f97316';
+  const optVeinColor = options?.veinGlowColor || '#fbbf24';
 
   // 1. Canvases
   const colorCanvas = document.createElement('canvas');
@@ -59,19 +74,31 @@ export function generatePetalTextures(resolution = 1024): PetalTextureSet {
   // • Bordes: amarillo más cálido / ámbar
   // ----------------------------------------------------
 
-  // Fondo base de ámbar cálido a amarillo dorado
+  const cBase = new THREE.Color(optBaseColor);
+  const cMid = new THREE.Color(optMidColor);
+  const cTip = new THREE.Color(optTipColor);
+  const cVein = new THREE.Color(optVeinColor);
+
+  const baseDeep = new THREE.Color(cBase).multiplyScalar(0.4).getStyle();
+  const baseMid = new THREE.Color(cBase).getStyle();
+  const baseBright = new THREE.Color(cBase).lerp(cMid, 0.45).getStyle();
+  const midStyle = cMid.getStyle();
+  const tipSoft = new THREE.Color(cMid).lerp(cTip, 0.5).getStyle();
+  const tipStyle = cTip.getStyle();
+  const veinStyle = cVein.getStyle();
+
+  // Fondo base
   const baseGrad = ctxC.createLinearGradient(0, height, 0, 0);
-  baseGrad.addColorStop(0.0, '#3b0764'); // base ultradeep violeta
-  baseGrad.addColorStop(0.08, '#a21caf'); // magenta profundo
-  baseGrad.addColorStop(0.24, '#c026d3'); // magenta vibrante
-  baseGrad.addColorStop(0.42, '#f59e0b'); // transición ámbar dorada
-  baseGrad.addColorStop(0.70, '#facc15'); // amarillo dorado brillante
-  baseGrad.addColorStop(0.92, '#fbbf24'); // oro cálido
-  baseGrad.addColorStop(1.0, '#f97316'); // punta con toque ámbar/rosa
+  baseGrad.addColorStop(0.0, baseDeep); // base ultradeep
+  baseGrad.addColorStop(0.12, baseMid); // color base de inserción
+  baseGrad.addColorStop(0.28, baseBright); // transición suave
+  baseGrad.addColorStop(0.60, midStyle); // color central radiante
+  baseGrad.addColorStop(0.88, tipSoft); // transición a la punta
+  baseGrad.addColorStop(1.0, tipStyle); // color apical/punta
   ctxC.fillStyle = baseGrad;
   ctxC.fillRect(0, 0, width, height);
 
-  // Degradado transversal para bordes de ámbar cálido
+  // Degradado transversal para bordes cálidos/vibrantes
   const edgeGrad = ctxC.createRadialGradient(
     width / 2,
     height * 0.55,
@@ -80,32 +107,29 @@ export function generatePetalTextures(resolution = 1024): PetalTextureSet {
     height * 0.55,
     width * 0.52
   );
-  edgeGrad.addColorStop(0.0, 'rgba(254, 240, 138, 0.6)'); // amarillo suave central
-  edgeGrad.addColorStop(0.5, 'rgba(245, 158, 11, 0.2)'); // oro
-  edgeGrad.addColorStop(0.85, 'rgba(217, 119, 6, 0.5)'); // borde ámbar
-  edgeGrad.addColorStop(1.0, 'rgba(194, 65, 12, 0.85)'); // orilla ámbar profundo
+  edgeGrad.addColorStop(0.0, 'rgba(255, 255, 255, 0.25)'); // realce suave central
+  edgeGrad.addColorStop(0.55, 'rgba(255, 255, 255, 0.05)');
+  edgeGrad.addColorStop(0.85, cTip.clone().multiplyScalar(0.85).getStyle()); // borde
+  edgeGrad.addColorStop(1.0, cTip.clone().multiplyScalar(0.6).getStyle()); // orilla profunda
   ctxC.fillStyle = edgeGrad;
   ctxC.fillRect(0, 0, width, height);
 
-  // Centro magenta/rosa intenso que se proyecta en estrías verticales desde la base
-  // ("Base del pétalo - conexión al centro de la flor")
-  const centerMagentaGrad = ctxC.createLinearGradient(0, height, 0, height * 0.35);
-  centerMagentaGrad.addColorStop(0.0, '#701a75');
-  centerMagentaGrad.addColorStop(0.2, '#c026d3');
-  centerMagentaGrad.addColorStop(0.5, '#e879f9');
-  centerMagentaGrad.addColorStop(0.8, '#f472b6');
-  centerMagentaGrad.addColorStop(1.0, 'rgba(244, 114, 182, 0.0)');
+  // Centro de inserción basal que se proyecta en estrías verticales
+  const centerBaseGrad = ctxC.createLinearGradient(0, height, 0, height * 0.35);
+  centerBaseGrad.addColorStop(0.0, baseDeep);
+  centerBaseGrad.addColorStop(0.3, baseMid);
+  centerBaseGrad.addColorStop(0.7, baseBright);
+  centerBaseGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
 
-  // Flutes / estrías verticales magenta en el tercio inferior
+  // Flutes / estrías verticales en el tercio inferior
   const fluteCount = 9;
   for (let f = 0; f < fluteCount; f++) {
     const normF = (f - (fluteCount - 1) / 2) / ((fluteCount - 1) / 2);
     const fluteX = width / 2 + normF * (width * 0.22);
     const fluteGrad = ctxC.createLinearGradient(fluteX, height, fluteX, height * 0.32);
-    fluteGrad.addColorStop(0.0, '#86198f');
-    fluteGrad.addColorStop(0.25, '#d946ef');
-    fluteGrad.addColorStop(0.65, '#f472b6');
-    fluteGrad.addColorStop(1.0, 'rgba(244, 114, 182, 0)');
+    fluteGrad.addColorStop(0.0, baseMid);
+    fluteGrad.addColorStop(0.35, baseBright);
+    fluteGrad.addColorStop(1.0, 'rgba(255, 255, 255, 0)');
 
     ctxC.beginPath();
     ctxC.moveTo(fluteX - width * 0.035, height);
@@ -130,12 +154,11 @@ export function generatePetalTextures(resolution = 1024): PetalTextureSet {
   ctxE.fillStyle = '#000000';
   ctxE.fillRect(0, 0, width, height);
 
-  // Base púrpura/magenta bioluminiscente en el mapa de emisión
+  // Base bioluminiscente en el mapa de emisión
   const baseEmissGrad = ctxE.createLinearGradient(0, height, 0, height * 0.40);
-  baseEmissGrad.addColorStop(0.0, '#d946ef');
-  baseEmissGrad.addColorStop(0.3, '#c026d3');
-  baseEmissGrad.addColorStop(0.65, '#a21caf');
-  baseEmissGrad.addColorStop(1.0, 'rgba(162, 28, 175, 0)');
+  baseEmissGrad.addColorStop(0.0, baseMid);
+  baseEmissGrad.addColorStop(0.4, baseBright);
+  baseEmissGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
   ctxE.fillStyle = baseEmissGrad;
   ctxE.fillRect(width * 0.2, height * 0.4, width * 0.6, height * 0.6);
 
@@ -166,17 +189,17 @@ export function generatePetalTextures(resolution = 1024): PetalTextureSet {
     intensity: number
   ) {
     // 1. Color base
-    ctxC.strokeStyle = `rgba(255, 245, 180, ${intensity * 0.85})`;
+    ctxC.strokeStyle = `rgba(255, 255, 255, ${intensity * 0.85})`;
     ctxC.lineWidth = Math.max(1, thickness);
     ctxC.beginPath();
     ctxC.moveTo(x1, y1);
     ctxC.lineTo(x2, y2);
     ctxC.stroke();
 
-    // 2. Emisión (halo dorado cálido + núcleo blanco)
-    ctxE.shadowColor = '#f59e0b';
+    // 2. Emisión (halo bioluminiscente según optVeinColor + núcleo blanco)
+    ctxE.shadowColor = veinStyle;
     ctxE.shadowBlur = glowWidth * 1.6;
-    ctxE.strokeStyle = `rgba(251, 191, 36, ${intensity * 0.9})`;
+    ctxE.strokeStyle = veinStyle;
     ctxE.lineWidth = Math.max(1.5, thickness * 1.5);
     ctxE.beginPath();
     ctxE.moveTo(x1, y1);
@@ -354,19 +377,19 @@ export function generatePetalTextures(resolution = 1024): PetalTextureSet {
   // Con quilla dorsal y brillo cálido transmitido
   // ----------------------------------------------------
   const backGrad = ctxB.createLinearGradient(0, height, 0, 0);
-  backGrad.addColorStop(0.0, '#2e0854'); // base posterior
-  backGrad.addColorStop(0.2, '#701a75'); // magenta tenue
-  backGrad.addColorStop(0.5, '#b45309'); // ámbar posterior
-  backGrad.addColorStop(0.85, '#d97706'); // oro miel
-  backGrad.addColorStop(1.0, '#ea580c'); // punta
+  backGrad.addColorStop(0.0, baseDeep); // base posterior
+  backGrad.addColorStop(0.2, baseMid); // magenta/base tenue
+  backGrad.addColorStop(0.5, cMid.clone().multiplyScalar(0.7).getStyle()); // cuerpo posterior
+  backGrad.addColorStop(0.85, cMid.getStyle()); // oro/cuerpo
+  backGrad.addColorStop(1.0, tipStyle); // punta
   ctxB.fillStyle = backGrad;
   ctxB.fillRect(0, 0, width, height);
 
   // Quilla dorsal central clara (nervadura prominente visible en vista posterior)
   const keelGrad = ctxB.createLinearGradient(centerX - 15, 0, centerX + 15, 0);
-  keelGrad.addColorStop(0, 'rgba(251, 191, 36, 0)');
-  keelGrad.addColorStop(0.5, 'rgba(254, 240, 138, 0.75)');
-  keelGrad.addColorStop(1, 'rgba(251, 191, 36, 0)');
+  keelGrad.addColorStop(0, 'rgba(255, 255, 255, 0)');
+  keelGrad.addColorStop(0.5, veinStyle);
+  keelGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
   ctxB.fillStyle = keelGrad;
   ctxB.fillRect(centerX - 18, height * 0.08, 36, height * 0.88);
 

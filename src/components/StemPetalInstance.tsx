@@ -1,9 +1,13 @@
 import { useMemo } from 'react';
 import { Petal } from './Petal';
 import { StemPetalConfig, STEM_PETAL_CONFIG, getStemPetalTransform } from '../config/stemPetalConfig';
+import { PetalConfig, PETAL_CONFIG } from '../config/petalConfig';
 
 export interface StemPetalInstanceProps {
   config?: Partial<StemPetalConfig>;
+  petalConfig?: Partial<PetalConfig>;
+  wireframe?: boolean;
+  showSparkles?: boolean;
 }
 
 /**
@@ -14,14 +18,23 @@ export interface StemPetalInstanceProps {
  * - Conexión natural con el tallo: sin flotar, sin hueco, sin penetración excesiva
  * - Orientado hacia arriba, siguiendo la curvatura orgánica del tallo con inclinación suave
  */
-export function StemPetalInstance({ config }: StemPetalInstanceProps) {
-  const mergedConfig = useMemo(() => {
+export function StemPetalInstance({
+  config,
+  petalConfig: petalConfigOverride,
+  wireframe = false,
+  showSparkles = false,
+}: StemPetalInstanceProps) {
+  const mergedStemConfig = useMemo(() => {
     return { ...STEM_PETAL_CONFIG, ...config };
   }, [config]);
 
+  const mergedPetalConfig = useMemo(() => {
+    return { ...PETAL_CONFIG, ...petalConfigOverride };
+  }, [petalConfigOverride]);
+
   const transform = useMemo(() => {
-    return getStemPetalTransform(mergedConfig);
-  }, [mergedConfig]);
+    return getStemPetalTransform(mergedStemConfig, mergedPetalConfig);
+  }, [mergedStemConfig, mergedPetalConfig]);
 
   return (
     <group
@@ -34,7 +47,12 @@ export function StemPetalInstance({ config }: StemPetalInstanceProps) {
         El offset basePivotOffset sitúa la base de inserción del pétalo 
         exactamente en el punto de anclaje (0, 0, 0) del grupo en la cúspide del tallo.
       */}
-      <Petal position={transform.basePivotOffset} showSparkles={false} />
+      <Petal
+        position={transform.basePivotOffset}
+        config={mergedPetalConfig}
+        wireframe={wireframe}
+        showSparkles={showSparkles}
+      />
     </group>
   );
 }

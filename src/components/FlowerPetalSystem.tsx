@@ -18,14 +18,35 @@
 import { useMemo } from 'react';
 import { Petal } from './Petal';
 import { FlowerStamens } from './FlowerStamens';
-import { FLOWER_CONFIG, FlowerConfig, getFlowerPetalTransforms } from '../config/flowerConfig';
+import {
+  FLOWER_CONFIG,
+  FlowerConfig,
+  IndividualPetalOverride,
+  getFlowerPetalTransforms,
+} from '../config/flowerConfig';
+import { PETAL_CONFIG, PetalConfig } from '../config/petalConfig';
 
 export interface FlowerPetalSystemProps {
   config?: FlowerConfig;
+  petalConfig?: Partial<PetalConfig>;
+  individualOverrides?: Record<number, IndividualPetalOverride>;
+  selectedPetalIndex?: number | null;
 }
 
-export function FlowerPetalSystem({ config = FLOWER_CONFIG }: FlowerPetalSystemProps) {
-  const transforms = useMemo(() => getFlowerPetalTransforms(config), [config]);
+export function FlowerPetalSystem({
+  config = FLOWER_CONFIG,
+  petalConfig = PETAL_CONFIG,
+  individualOverrides,
+  selectedPetalIndex = null,
+}: FlowerPetalSystemProps) {
+  const mergedPetalConfig = useMemo(
+    () => ({ ...PETAL_CONFIG, ...petalConfig }),
+    [petalConfig]
+  );
+  const transforms = useMemo(
+    () => getFlowerPetalTransforms(config, mergedPetalConfig, individualOverrides),
+    [config, mergedPetalConfig, individualOverrides]
+  );
 
   return (
     <group
@@ -38,34 +59,42 @@ export function FlowerPetalSystem({ config = FLOWER_CONFIG }: FlowerPetalSystemP
         Cada pétalo es una instancia del Petal Master aprobada.
         Nace cerca del centro y se proyecta hacia afuera con inclinación intermedia.
       */}
-      {transforms.petals.map((petal) => (
-        <group
-          key={`flower-petal-${petal.index}`}
-          name={`petal-radial-slot-${petal.index}`}
-          rotation={[0, petal.azimuth, 0]}
-        >
-          {/*
-            1. Desplazamiento radial 'centerRadius': las bases se aproximan en el centro
-               sin perforarse exageradamente y dejando el receptáculo central visible.
-            2. Inclinación 'openTilt': expande el pétalo hacia afuera y arriba (\ /).
-            3. Variaciones sutiles orgánicas: elevación, escala y leve roll para evitar
-               la apariencia de estrella rígida matemática.
-          */}
+      {transforms.petals.map((petal) => {
+        const isSelected = selectedPetalIndex === petal.index;
+
+        return (
           <group
-            name={`petal-anchor-${petal.index}`}
-            position={[0, petal.elevation, -config.centerRadius]}
-            rotation={[petal.tilt, Math.PI, petal.roll]}
-            scale={[petal.scale, petal.scale, petal.scale]}
+            key={`flower-petal-${petal.index}`}
+            name={`petal-radial-slot-${petal.index}`}
+            rotation={[0, petal.azimuth, 0]}
           >
             {/*
-              Petal Master aprobado sin modificar.
-              El position={petal.pivotOffset} sitúa el punto de nacimiento (u=0)
-              exactamente en el anclaje central.
+              1. Desplazamiento radial 'centerRadius': las bases se aproximan en el centro
+                 sin colisionar y dejando el receptáculo central visible para los estambres.
+              2. Inclinación 'openTilt' con Euler 'YXZ': despliega el pétalo en arco ∩ descendente
+                 tipo paraguas/campánula idéntico a la instancia calibrada del taller.
+              3. Variaciones sutiles orgánicas: elevación, escala y leve roll para una estética natural.
             */}
-            <Petal position={petal.pivotOffset} showSparkles={false} />
+            <group
+              name={`petal-anchor-${petal.index}`}
+              position={[0, petal.elevation, petal.centerRadius]}
+              rotation={petal.euler}
+              scale={[petal.scale, petal.scale, petal.scale]}
+            >
+              {/*
+                Petal Master con la configuración activa (global o personalizada para este pétalo).
+                El position={petal.pivotOffset} sitúa el punto de nacimiento (u=0)
+                exactamente en el anclaje central.
+              */}
+              <Petal
+                config={petal.petalConfig}
+                position={petal.pivotOffset}
+                showSparkles={isSelected}
+              />
+            </group>
           </group>
-        </group>
-      ))}
+        );
+      })}
 
       {/*
         EXACTAMENTE 3 ESTRUCTURAS FLORALES TIPO ESTAMBRE BIOLUMINISCENTES

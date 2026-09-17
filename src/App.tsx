@@ -24,7 +24,15 @@ export default function App() {
       id="app-root"
       className="relative w-screen h-screen overflow-hidden bg-[#0c0517] select-none font-sans text-slate-100"
     >
-      {/* 1. Lienzo 3D en pantalla completa: Escena Cinematográfica Definitiva */}
+      {/* 1. Control de Música Minimalista en la esquina superior derecha */}
+      <aside
+        id="music-control-wrapper"
+        className="absolute top-4 right-4 z-20 flex items-center p-1 rounded-2xl backdrop-blur-xl bg-slate-950/40 border border-white/10 shadow-2xl hover:bg-slate-950/60 transition-colors"
+      >
+        <BackgroundMusic />
+      </aside>
+
+      {/* 2. Lienzo 3D en pantalla completa: Flor Completa Bioluminiscente en Noche Mágica */}
       <Canvas
         id="three-canvas"
         gl={{
@@ -44,15 +52,7 @@ export default function App() {
         />
       </Canvas>
 
-      {/* 2. Control de Música Minimalista y Discreto en la esquina superior */}
-      <aside
-        id="music-control-wrapper"
-        className="absolute top-5 right-5 z-20 flex items-center p-1 rounded-2xl backdrop-blur-xl bg-slate-950/40 border border-white/10 shadow-2xl hover:bg-slate-950/60 transition-colors"
-      >
-        <BackgroundMusic />
-      </aside>
-
-      {/* 3. Único Mensaje en Pantalla — Elegante, Poético y Cinematográfico */}
+      {/* 3. Mensaje Poético en Pantalla */}
       <div
         id="magical-dedication-message"
         className={`absolute bottom-8 md:bottom-12 left-1/2 -translate-x-1/2 text-center pointer-events-none z-10 px-6 max-w-xl transition-all duration-1000 ease-out select-none ${
