@@ -124,8 +124,8 @@ export function Island() {
         const i2 = (rIndex + 1) * radialSegments + aIndex;
         const i3 = (rIndex + 1) * radialSegments + nextA;
 
-        indices.push(i0, i2, i1);
-        indices.push(i1, i2, i3);
+        indices.push(i0, i1, i2);
+        indices.push(i1, i3, i2);
       }
     }
 
@@ -160,6 +160,7 @@ export function Island() {
           roughness={ISLAND_CONFIG.roughness}
           metalness={ISLAND_CONFIG.metalness}
           flatShading={false}
+          side={THREE.DoubleSide}
         />
       </mesh>
     </group>
