@@ -2,14 +2,29 @@ import { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { WATER_CONFIG } from '../config/waterConfig';
+import { LANTERNS_DATA } from '../config/lanternsConfig';
 import { FloatingPlants } from './FloatingPlants';
 
 export function Water() {
   const waterMeshRef = useRef<THREE.Mesh>(null);
   const materialRef = useRef<THREE.ShaderMaterial>(null);
 
-  // Shaders personalizados para agua de estanque natural y profunda
+  // Shaders personalizados para agua de estanque natural con reflejos de linternas flotantes
   const { uniforms, vertexShader, fragmentShader } = useMemo(() => {
+    // Tomamos las 20 linternas más representativas y cercanas al agua
+    const lanternVectors: THREE.Vector4[] = [];
+    for (let i = 0; i < 20; i++) {
+      const cfg = LANTERNS_DATA[i];
+      lanternVectors.push(
+        new THREE.Vector4(
+          cfg ? cfg.position[0] : 0,
+          cfg ? cfg.position[1] : 2,
+          cfg ? cfg.position[2] : 0,
+          cfg ? cfg.emissiveIntensity : 1.0
+        )
+      );
+    }
+
     return {
       uniforms: {
         uTime: { value: 0 },
@@ -21,6 +36,7 @@ export function Water() {
         uHorizonColor: { value: new THREE.Color(WATER_CONFIG.horizonColor) },
         uSunPosition: { value: new THREE.Vector3(15, 25, 15) },
         uTransparency: { value: WATER_CONFIG.transparency },
+        uLanterns: { value: lanternVectors },
       },
       vertexShader: `
         uniform float uTime;
@@ -68,6 +84,7 @@ export function Water() {
         uniform vec3 uHorizonColor;
         uniform vec3 uSunPosition;
         uniform float uTransparency;
+        uniform vec4 uLanterns[20];
 
         varying vec3 vWorldPosition;
         varying vec3 vNormal;
@@ -86,15 +103,49 @@ export function Water() {
           vec3 waterTone = mix(uDeepColor, uSurfaceColor, clamp(vElevation * 3.5 + 0.45, 0.0, 1.0));
           vec3 finalColor = mix(waterTone, uHorizonColor, fresnelTerm * 0.72);
 
-          // Iluminación ambiental y solar suave diurna
+          // Iluminación ambiental y solar suave
           vec3 lightDir = normalize(uSunPosition);
           float diff = max(dot(normal, lightDir), 0.0);
-          finalColor += uSurfaceColor * (diff * 0.2);
+          finalColor += uSurfaceColor * (diff * 0.15);
 
-          // Reflejo especular satinado suave (sin brillos blancos puntuales)
+          // Reflejo especular satinado suave
           vec3 halfVector = normalize(lightDir + viewDir);
           float spec = pow(max(dot(normal, halfVector), 0.0), 28.0);
-          finalColor += vec3(0.12, 0.18, 0.22) * spec * 0.35;
+          finalColor += vec3(0.12, 0.18, 0.22) * spec * 0.25;
+
+          // ──── REFLEJOS REALISTAS DE LAS LINTERNAS FLOTANTES EN EL AGUA (TANGLED STYLE) ────
+          vec3 lanternGlowTotal = vec3(0.0);
+          vec3 warmGold = vec3(1.0, 0.78, 0.32);   // Tono amarillo atardecer / dorado
+          vec3 deepAmber = vec3(0.98, 0.52, 0.15); // Tono ámbar fuego de vela
+
+          for (int i = 0; i < 20; i++) {
+            vec4 lData = uLanterns[i];
+            if (lData.w <= 0.01) continue;
+
+            vec3 lPos = lData.xyz;
+            vec3 toL = lPos - vWorldPosition;
+            float dist3D = length(toL);
+            float distXZ = length(toL.xz);
+
+            vec3 lDir = toL / dist3D;
+            vec3 h = normalize(lDir + viewDir);
+            float nDotH = max(dot(normal, h), 0.0);
+
+            // Estela alargada característica de reflejos sobre agua ondulada
+            // Se estira y vibra orgánicamente con las olas hacia la cámara
+            float specSharp = pow(nDotH, 44.0) * 2.2;
+            float specSpread = pow(nDotH, 12.0) * 0.45;
+            float atten = 1.0 / (1.0 + dist3D * 0.16 + dist3D * dist3D * 0.009);
+
+            // Resplandor cálido directo sobre el agua debajo de cada linterna baja
+            float underGlow = exp(-distXZ * 0.65) * (1.25 / (lPos.y + 0.45));
+
+            vec3 col = mix(deepAmber, warmGold, clamp(specSharp, 0.0, 1.0));
+            lanternGlowTotal += col * (specSharp + specSpread + underGlow * 0.4) * atten * lData.w;
+          }
+
+          // Los reflejos en el agua se intensifican naturalmente con el ángulo Fresnel
+          finalColor += lanternGlowTotal * (fresnelTerm * 0.65 + 0.45);
 
           gl_FragColor = vec4(finalColor, uTransparency);
         }
@@ -102,10 +153,27 @@ export function Water() {
     };
   }, []);
 
-  // Animación del tiempo del agua en cada frame
+  // Animación del tiempo del agua y actualización continua de las linternas reflejadas
   useFrame(({ clock }) => {
     if (materialRef.current) {
-      materialRef.current.uniforms.uTime.value = clock.getElapsedTime();
+      const t = clock.getElapsedTime();
+      materialRef.current.uniforms.uTime.value = t;
+
+      // Actualizar dinámicamente las posiciones de las linternas para el cálculo de reflejos
+      const lanternsArray = materialRef.current.uniforms.uLanterns.value as THREE.Vector4[];
+      for (let i = 0; i < 20; i++) {
+        const cfg = LANTERNS_DATA[i];
+        if (!cfg) break;
+        const dy = Math.sin(t * cfg.floatSpeed + cfg.floatPhase) * cfg.floatAmplitude;
+        const dx = Math.sin(t * cfg.driftSpeedX + cfg.driftPhase) * cfg.driftAmpX;
+        const dz = Math.cos(t * cfg.driftSpeedZ + cfg.driftPhase * 1.3) * cfg.driftAmpZ;
+        lanternsArray[i].set(
+          cfg.position[0] + dx,
+          Math.max(0.6, cfg.position[1] + dy),
+          cfg.position[2] + dz,
+          cfg.emissiveIntensity
+        );
+      }
     }
   });
 
@@ -152,12 +220,13 @@ export function Water() {
         />
       </mesh>
 
-      {/* 3. Superficie del agua dinámica con ondas naturales */}
+      {/* 3. Superficie del agua dinámica con ondas y reflejos de linternas */}
       <mesh
         ref={waterMeshRef}
         position={[0, 0, 0]}
         rotation={[-Math.PI / 2, 0, 0]}
         receiveShadow
+        renderOrder={2}
       >
         <planeGeometry
           args={[

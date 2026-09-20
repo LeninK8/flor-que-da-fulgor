@@ -1690,144 +1690,191 @@ export const LANTERNS_DATA: LanternItemConfig[] = [
  * - Cenefas ornamentadas con filigrana curva y corazones entrelazados
  * - Sol de la corona de Rapunzel con 16 rayos alternados (curvos y rectos) y filo dorado
  */
-export function generateProceduralLanternTexture(withLogos = true): THREE.CanvasTexture {
-  const canvasSize = 2048;
-  const canvas = document.createElement('canvas');
-  canvas.width = canvas.height = canvasSize;
-  const ctx = canvas.getContext('2d');
+/**
+ * GENERADOR DE TEXTURA PROCEDURAL DE LA LINTERNA DE RAPUNZEL
+ * Traslada de forma fidedigna el diseño de Rapunzel / Tangled adaptado a la forma escultórica de linterna:
+ * - Fondo degradado dorado/amarillo cálido original (#ffe04f -> #ffcc22 -> #ff9900)
+ * - Grano sutil de papel artesanal
+ * - Cenefas ornamentadas con filigrana curva y corazones entrelazados bajo la cúpula y sobre la base
+ * - Sol de la corona de Rapunzel con 16 rayos alternados (curvos y rectos) y filo dorado
+ */
+export function generateRapunzelLanternTextures(): {
+  map: THREE.CanvasTexture;
+  emissiveMap: THREE.CanvasTexture;
+} {
+  const texW = 2048;
+  const texH = 1280;
 
-  if (!ctx) {
-    const fallbackTexture = new THREE.CanvasTexture(canvas);
-    return fallbackTexture;
-  }
+  // 1. Albedo Canvas
+  const canvasA = document.createElement('canvas');
+  canvasA.width = texW;
+  canvasA.height = texH;
+  const ctxA = canvasA.getContext('2d')!;
 
-  // Colores del diseño de Rapunzel
-  const primaryColor = '#941c7b'; // Púrpura / Magenta real
-  const goldOutline = '#ffb700';  // Borde dorado del sol
+  // 2. Emissive Canvas
+  const canvasE = document.createElement('canvas');
+  canvasE.width = texW;
+  canvasE.height = texH;
+  const ctxE = canvasE.getContext('2d')!;
 
-  // A. Fondo brillante amarillo/naranja
-  const bgGrad = ctx.createLinearGradient(0, 0, 0, canvasSize);
+  // Colores del diseño de Rapunzel (intactos, sin alterar)
+  const primaryColor = '#941c7b'; // Púrpura / Magenta real original
+  const goldOutline = '#ffb700';  // Borde dorado del sol original
+
+  // A. Fondo brillante amarillo/naranja en Albedo
+  const bgGrad = ctxA.createLinearGradient(0, 0, 0, texH);
   bgGrad.addColorStop(0, '#ffe04f');
   bgGrad.addColorStop(0.5, '#ffcc22');
   bgGrad.addColorStop(1, '#ff9900');
-  ctx.fillStyle = bgGrad;
-  ctx.fillRect(0, 0, canvasSize, canvasSize);
+  ctxA.fillStyle = bgGrad;
+  ctxA.fillRect(0, 0, texW, texH);
+
+  // Fondo cálido radiante en Emissive
+  const emissiveGrad = ctxE.createLinearGradient(0, 0, 0, texH);
+  emissiveGrad.addColorStop(0.0, '#9c4e0b');
+  emissiveGrad.addColorStop(0.28, '#cf7216');
+  emissiveGrad.addColorStop(0.55, '#ffcf40');
+  emissiveGrad.addColorStop(0.85, '#ffad28');
+  emissiveGrad.addColorStop(1.0, '#ff8c10');
+  ctxE.fillStyle = emissiveGrad;
+  ctxE.fillRect(0, 0, texW, texH);
 
   // B. Textura sutil de papel
-  ctx.fillStyle = 'rgba(180, 80, 0, 0.03)';
-  for (let i = 0; i < 15000; i++) {
-    ctx.fillRect(
-      Math.random() * canvasSize,
-      Math.random() * canvasSize,
+  ctxA.fillStyle = 'rgba(180, 80, 0, 0.035)';
+  for (let i = 0; i < 10000; i++) {
+    ctxA.fillRect(
+      Math.random() * texW,
+      Math.random() * texH,
       Math.random() * 4,
-      Math.random() * 12
+      Math.random() * 10
     );
   }
 
-  if (withLogos) {
-    // Mini corazón en la filigrana
-    function drawMiniHeart(x: number, y: number, size: number) {
-      if (!ctx) return;
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.beginPath();
-      const topCurveHeight = size * 0.3;
-      ctx.moveTo(0, topCurveHeight);
-      ctx.bezierCurveTo(-size / 2, -topCurveHeight, -size, size / 2.5, 0, size);
-      ctx.bezierCurveTo(size, size / 2.5, size / 2, -topCurveHeight, 0, topCurveHeight);
-      ctx.fill();
-      ctx.restore();
-    }
-
-    // C. Bordes superior e inferior con filigrana entrelazada y corazones
-    function drawIntricateBorder(y: number) {
-      if (!ctx) return;
-      const unitWidth = 204.8; // 10 repeticiones a lo ancho (2048 / 10)
-      ctx.fillStyle = primaryColor;
-      ctx.strokeStyle = primaryColor;
-      ctx.lineWidth = 10;
-      ctx.lineCap = 'round';
-
-      for (let i = 0; i < 10; i++) {
-        const x = i * unitWidth;
-
-        // 1. Enredadera curva (Scrollwork)
-        ctx.beginPath();
-        ctx.moveTo(x + 35, y - 10);
-        ctx.bezierCurveTo(x + 5, y - 45, x + 70, y - 55, x + 55, y + 5);
-        ctx.bezierCurveTo(x + 40, y + 50, x + 130, y + 50, x + 160, y - 10);
-        ctx.stroke();
-
-        // Punto de inicio de la filigrana
-        ctx.beginPath();
-        ctx.arc(x + 35, y - 10, 9, 0, Math.PI * 2);
-        ctx.fill();
-
-        // 2. Los dos corazones emparejados en la parte baja
-        drawMiniHeart(x + 90, y + 35, 22);
-        drawMiniHeart(x + 120, y + 35, 22);
-      }
-    }
-
-    // Dibujar cenefas superior e inferior
-    drawIntricateBorder(220);
-    drawIntricateBorder(1828);
-
-    // D. Sol de Rapunzel con borde dorado
-    function drawExactSun(cx: number, cy: number, totalSize: number) {
-      if (!ctx) return;
-      ctx.save();
-      ctx.translate(cx, cy);
-
-      ctx.fillStyle = primaryColor;
-      ctx.strokeStyle = goldOutline;
-      ctx.lineWidth = 14;
-      ctx.lineJoin = 'round';
-
-      // 16 rayos alternados
-      const numRays = 16;
-      for (let i = 0; i < numRays; i++) {
-        const angle = (i * Math.PI * 2) / numRays;
-        ctx.save();
-        ctx.rotate(angle);
-        ctx.beginPath();
-
-        const innerY = totalSize * 0.22;
-
-        if (i % 2 === 0) {
-          // Rayo curvo / ondulado
-          ctx.moveTo(-28, innerY);
-          ctx.bezierCurveTo(-55, 330, 60, 380, 0, totalSize * 0.58);
-          ctx.bezierCurveTo(-30, 380, 30, 330, 28, innerY);
-        } else {
-          // Rayo recto / agudo
-          ctx.moveTo(-35, innerY);
-          ctx.lineTo(0, totalSize * 0.45);
-          ctx.lineTo(35, innerY);
-        }
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
-        ctx.restore();
-      }
-
-      // Círculo central sobre los rayos
-      ctx.beginPath();
-      ctx.arc(0, 0, totalSize * 0.23, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-
-      ctx.restore();
-    }
-
-    // Dos soles frontales y traseros en el cilindro
-    drawExactSun(512, 1024, 680);
-    drawExactSun(1536, 1024, 680);
+  // Mini corazón en la filigrana
+  function drawMiniHeart(ctx: CanvasRenderingContext2D, x: number, y: number, size: number) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.beginPath();
+    const topCurveHeight = size * 0.3;
+    ctx.moveTo(0, topCurveHeight);
+    ctx.bezierCurveTo(-size / 2, -topCurveHeight, -size, size / 2.5, 0, size);
+    ctx.bezierCurveTo(size, size / 2.5, size / 2, -topCurveHeight, 0, topCurveHeight);
+    ctx.fill();
+    ctx.restore();
   }
 
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.anisotropy = 16;
-  return texture;
+  // C. Bordes superior e inferior con filigrana entrelazada y corazones
+  function drawIntricateBorder(ctx: CanvasRenderingContext2D, y: number, color: string, alpha = 1.0) {
+    const unitWidth = texW / 10; // 10 repeticiones
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = color;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 8;
+    ctx.lineCap = 'round';
+
+    for (let i = 0; i < 10; i++) {
+      const x = i * unitWidth;
+
+      // Enredadera curva
+      ctx.beginPath();
+      ctx.moveTo(x + 30, y - 8);
+      ctx.bezierCurveTo(x + 5, y - 35, x + 60, y - 45, x + 48, y + 4);
+      ctx.bezierCurveTo(x + 35, y + 40, x + 115, y + 40, x + 140, y - 8);
+      ctx.stroke();
+
+      // Punto
+      ctx.beginPath();
+      ctx.arc(x + 30, y - 8, 7, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Corazones
+      drawMiniHeart(ctx, x + 80, y + 28, 18);
+      drawMiniHeart(ctx, x + 105, y + 28, 18);
+    }
+    ctx.restore();
+  }
+
+  // D. Sol de Rapunzel con 16 rayos y borde dorado
+  function drawExactSun(
+    ctx: CanvasRenderingContext2D,
+    cx: number,
+    cy: number,
+    totalSize: number,
+    isEmissive = false
+  ) {
+    ctx.save();
+    ctx.translate(cx, cy);
+
+    ctx.fillStyle = isEmissive ? '#1a0b02' : primaryColor;
+    ctx.strokeStyle = isEmissive ? '#ffcc33' : goldOutline;
+    ctx.lineWidth = isEmissive ? 8 : 12;
+    ctx.lineJoin = 'round';
+    if (isEmissive) ctx.globalAlpha = 0.72;
+
+    const numRays = 16;
+    for (let i = 0; i < numRays; i++) {
+      const angle = (i * Math.PI * 2) / numRays;
+      ctx.save();
+      ctx.rotate(angle);
+      ctx.beginPath();
+
+      const innerY = totalSize * 0.22;
+
+      if (i % 2 === 0) {
+        // Rayo curvo / ondulado
+        ctx.moveTo(-22, innerY);
+        ctx.bezierCurveTo(-45, totalSize * 0.32, 50, totalSize * 0.44, 0, totalSize * 0.58);
+        ctx.bezierCurveTo(-24, totalSize * 0.44, 24, totalSize * 0.32, 22, innerY);
+      } else {
+        // Rayo recto / agudo
+        ctx.moveTo(-28, innerY);
+        ctx.lineTo(0, totalSize * 0.46);
+        ctx.lineTo(28, innerY);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Círculo central sobre los rayos
+    ctx.beginPath();
+    ctx.arc(0, 0, totalSize * 0.23, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  // Dibujar cenefas en Albedo (posicionadas para la silueta con cúpula curva)
+  drawIntricateBorder(ctxA, 290, primaryColor, 1.0);
+  drawIntricateBorder(ctxA, 1150, primaryColor, 1.0);
+
+  // Dibujar cenefas en Emissive
+  drawIntricateBorder(ctxE, 290, '#1a0b02', 0.65);
+  drawIntricateBorder(ctxE, 1150, '#1a0b02', 0.65);
+
+  // Soles frontales y traseros (y = 690 en el centro del cuerpo)
+  drawExactSun(ctxA, 512, 690, 560, false);
+  drawExactSun(ctxA, 1536, 690, 560, false);
+
+  drawExactSun(ctxE, 512, 690, 560, true);
+  drawExactSun(ctxE, 1536, 690, 560, true);
+
+  const map = new THREE.CanvasTexture(canvasA);
+  map.wrapS = THREE.RepeatWrapping;
+  map.anisotropy = 16;
+
+  const emissiveMap = new THREE.CanvasTexture(canvasE);
+  emissiveMap.wrapS = THREE.RepeatWrapping;
+  emissiveMap.anisotropy = 16;
+
+  return { map, emissiveMap };
+}
+
+export function generateProceduralLanternTexture(withLogos = true): THREE.CanvasTexture {
+  return generateRapunzelLanternTextures().map;
 }
 
 /**

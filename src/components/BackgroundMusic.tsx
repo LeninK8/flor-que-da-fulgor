@@ -29,7 +29,7 @@ interface BackgroundMusicProps {
 export function BackgroundMusic({ onPlayStateChange }: BackgroundMusicProps) {
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [isMuted, setIsMuted] = useState<boolean>(false);
-  const [volume, setVolume] = useState<number>(40); // 40% inicial según solicitado
+  const [volume, setVolume] = useState<number>(100); // 100% Volumen al máximo solicitado
   const [isPlayerReady, setIsPlayerReady] = useState<boolean>(false);
   const [hasUserActivated, setHasUserActivated] = useState<boolean>(false);
   const [showVolumePopup, setShowVolumePopup] = useState<boolean>(false);
@@ -54,8 +54,8 @@ export function BackgroundMusic({ onPlayStateChange }: BackgroundMusicProps) {
       if (playerRef.current) return;
 
       playerRef.current = new window.YT.Player('youtube-audio-player', {
-        height: '1',
-        width: '1',
+        height: '64',
+        width: '64',
         videoId: videoId,
         playerVars: {
           autoplay: 1,
@@ -67,16 +67,19 @@ export function BackgroundMusic({ onPlayStateChange }: BackgroundMusicProps) {
           modestbranding: 1,
           playsinline: 1,
           rel: 0,
+          enablejsapi: 1,
+          origin: window.location.origin,
         },
         events: {
           onReady: (event: any) => {
             setIsPlayerReady(true);
             try {
-              event.target.setVolume(40);
-              // Intentar reproducción automática
+              event.target.unMute();
+              event.target.setVolume(100); // Volumen al máximo (100%)
+              // Intentar reproducción automática inmediata
               event.target.playVideo();
             } catch (err) {
-              console.log('Autoplay bloqueado hasta interacción del usuario:', err);
+              console.log('Autoplay inicial bloqueado por navegador hasta interacción:', err);
             }
           },
           onStateChange: (event: any) => {
@@ -126,6 +129,58 @@ export function BackgroundMusic({ onPlayStateChange }: BackgroundMusicProps) {
     };
   }, []);
 
+  // Escuchar cualquier interacción en la ventana para desbloquear el audio al máximo si el navegador aplicó bloqueo de autoplay en frío
+  useEffect(() => {
+    const triggerAudio = () => {
+      if (playerRef.current && !isPlayingRef.current) {
+        try {
+          playerRef.current.unMute();
+          playerRef.current.setVolume(100);
+          playerRef.current.playVideo();
+          setIsPlaying(true);
+          setHasUserActivated(true);
+        } catch (e) {
+          // ignore
+        }
+      }
+    };
+
+    const events = ['pointerdown', 'touchstart', 'mousedown', 'keydown', 'click'];
+    const handleInteraction = () => {
+      triggerAudio();
+      events.forEach((ev) => window.removeEventListener(ev, handleInteraction));
+    };
+
+    events.forEach((ev) => window.addEventListener(ev, handleInteraction, { passive: true }));
+
+    return () => {
+      events.forEach((ev) => window.removeEventListener(ev, handleInteraction));
+    };
+  }, []);
+
+  // Reintentos automáticos tras estar listo por si el navegador tardó en responder
+  useEffect(() => {
+    if (!isPlayerReady) return;
+    let attempts = 0;
+    const timer = setInterval(() => {
+      attempts++;
+      if (playerRef.current && !isPlayingRef.current) {
+        try {
+          playerRef.current.unMute();
+          playerRef.current.setVolume(100);
+          playerRef.current.playVideo();
+        } catch (e) {
+          // ignore
+        }
+      }
+      if (attempts >= 5 || isPlayingRef.current) {
+        clearInterval(timer);
+      }
+    }, 700);
+
+    return () => clearInterval(timer);
+  }, [isPlayerReady]);
+
   // Alternar reproducción / pausa
   const togglePlay = () => {
     if (!playerRef.current) return;
@@ -134,6 +189,8 @@ export function BackgroundMusic({ onPlayStateChange }: BackgroundMusicProps) {
         playerRef.current.pauseVideo();
         setIsPlaying(false);
       } else {
+        playerRef.current.unMute();
+        playerRef.current.setVolume(volume);
         playerRef.current.playVideo();
         setIsPlaying(true);
         setHasUserActivated(true);
@@ -181,8 +238,10 @@ export function BackgroundMusic({ onPlayStateChange }: BackgroundMusicProps) {
     setHasUserActivated(true);
     if (playerRef.current) {
       try {
-        playerRef.current.setVolume(volume);
+        playerRef.current.unMute();
+        playerRef.current.setVolume(100);
         playerRef.current.playVideo();
+        setIsPlaying(true);
       } catch (e) {
         console.warn('Error al activar música', e);
       }
@@ -191,17 +250,17 @@ export function BackgroundMusic({ onPlayStateChange }: BackgroundMusicProps) {
 
   return (
     <>
-      {/* Contenedor IFrame de YouTube completamente oculto fuera de pantalla */}
+      {/* Contenedor IFrame de YouTube posicionado activamente sin activar culling de navegador */}
       <div
         id="youtube-audio-container"
-        className="absolute -top-[9999px] -left-[9999px] w-1 h-1 pointer-events-none opacity-0 overflow-hidden"
+        className="fixed bottom-0 right-0 w-16 h-16 pointer-events-none opacity-[0.001] -z-50 overflow-hidden"
         aria-hidden="true"
       >
         <div id="youtube-audio-player" />
       </div>
 
-      {/* Botón elegante de aviso inicial para activar música si el navegador bloqueó el autoplay */}
-      {!isPlaying && !hasUserActivated && (
+      {/* Botón elegante de aviso si el navegador bloqueó el autoplay en frío */}
+      {!isPlaying && (
         <div
           id="music-autoplay-prompt"
           className="fixed bottom-14 left-1/2 -translate-x-1/2 z-20 animate-fade-in"
@@ -209,11 +268,11 @@ export function BackgroundMusic({ onPlayStateChange }: BackgroundMusicProps) {
           <button
             id="btn-activate-music"
             onClick={handleActivateMusic}
-            className="group flex items-center gap-2.5 px-4 py-2 rounded-full backdrop-blur-2xl bg-amber-950/80 border border-amber-500/40 text-amber-200 shadow-2xl shadow-amber-950/60 hover:bg-amber-900/90 hover:border-amber-400/70 hover:scale-105 active:scale-95 transition-all text-xs font-medium tracking-wide"
+            className="group flex items-center gap-2.5 px-4 py-2 rounded-full backdrop-blur-2xl bg-amber-950/80 border border-amber-500/40 text-amber-200 shadow-2xl shadow-amber-950/60 hover:bg-amber-900/90 hover:border-amber-400/70 hover:scale-105 active:scale-95 transition-all text-xs font-medium tracking-wide cursor-pointer"
           >
             <Music className="w-3.5 h-3.5 text-amber-300 animate-pulse" />
-            <span>🎵 Activar música: "Veo en ti la luz"</span>
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+            <span>🎵 Toca la pantalla para reproducir "Veo en ti la luz"</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
           </button>
         </div>
       )}
@@ -300,22 +359,22 @@ export function BackgroundMusic({ onPlayStateChange }: BackgroundMusicProps) {
             />
             <div className="flex justify-between items-center text-[10px] text-amber-100/40">
               <button
-                onClick={() => handleVolumeChange(20)}
+                onClick={() => handleVolumeChange(30)}
                 className="hover:text-amber-300 transition-colors"
               >
-                Suave (20%)
-              </button>
-              <button
-                onClick={() => handleVolumeChange(40)}
-                className="hover:text-amber-300 transition-colors font-medium text-amber-300/80"
-              >
-                Ideal (40%)
+                Suave (30%)
               </button>
               <button
                 onClick={() => handleVolumeChange(70)}
                 className="hover:text-amber-300 transition-colors"
               >
-                Alto (70%)
+                Medio (70%)
+              </button>
+              <button
+                onClick={() => handleVolumeChange(100)}
+                className="hover:text-amber-300 transition-colors font-medium text-amber-300/90"
+              >
+                Máx (100%)
               </button>
             </div>
           </div>
