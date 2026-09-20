@@ -1,40 +1,33 @@
 /**
  * COMPONENTE BACKGROUND MUSIC — "VEO EN TI LA LUZ" (ENREDADOS / TANGLED)
  *
- * Integración oficial mediante YouTube IFrame API:
- * - Canción: "Veo en ti la luz" (Video ID: fZSZMp32XaA).
+ * Integración mediante archivo de audio local descargado:
+ * - Canción: "Veo en ti la luz" (/veo-en-ti-la-luz.mp3).
  * - Reproducción continua en bucle (loop infinito).
- * - Volumen inicial moderado: 40% (rango 35-45%).
- * - Manejo elegante de políticas de autoplay del navegador:
- *   botón discreto "🎵 Activar música" si el navegador requiere interacción.
+ * - Volumen inicial al máximo (100%).
+ * - Manejo confiable de políticas de autoplay del navegador con interacción táctil/clic.
  * - Controles minimalistas: reproducir/pausar, silenciar/activar y ajuste de volumen.
- * - Cero impacto visual negativo: reproductor de YouTube completamente oculto fuera de pantalla.
  */
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Volume2, VolumeX, Play, Pause, Music, Sliders } from 'lucide-react';
-
-declare global {
-  interface Window {
-    YT: any;
-    onYouTubeIframeAPIReady: () => void;
-  }
-}
 
 interface BackgroundMusicProps {
   // Callback opcional de estado
   onPlayStateChange?: (isPlaying: boolean) => void;
 }
 
+// Ruta absoluta sincronizada con la base URL de Vite (resuelve /flor-que-da-fulgor/veo-en-ti-la-luz.mp3)
+const baseUrl = ((import.meta as unknown as { env?: { BASE_URL?: string } }).env?.BASE_URL || '/').replace(/\/$/, '');
+const AUDIO_URL = `${baseUrl}/veo-en-ti-la-luz.mp3`;
+
 export function BackgroundMusic({ onPlayStateChange }: BackgroundMusicProps) {
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [isMuted, setIsMuted] = useState<boolean>(false);
-  const [volume, setVolume] = useState<number>(100); // 100% Volumen al máximo solicitado
-  const [isPlayerReady, setIsPlayerReady] = useState<boolean>(false);
-  const [hasUserActivated, setHasUserActivated] = useState<boolean>(false);
+  const [volume, setVolume] = useState<number>(100); // 100% Volumen al máximo
   const [showVolumePopup, setShowVolumePopup] = useState<boolean>(false);
 
-  const playerRef = useRef<any>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const isPlayingRef = useRef<boolean>(false);
 
   // Mantener ref sincronizada para eventos
@@ -43,111 +36,50 @@ export function BackgroundMusic({ onPlayStateChange }: BackgroundMusicProps) {
     onPlayStateChange?.(isPlaying);
   }, [isPlaying, onPlayStateChange]);
 
-  // Carga e inicialización de la API oficial de YouTube IFrame
+  // Sincronizar volumen y silencio en el elemento de audio
   useEffect(() => {
-    const videoId = 'fZSZMp32XaA';
-
-    const initPlayer = () => {
-      if (!window.YT || !window.YT.Player) return;
-
-      // Evitar recreación si ya existe
-      if (playerRef.current) return;
-
-      playerRef.current = new window.YT.Player('youtube-audio-player', {
-        height: '64',
-        width: '64',
-        videoId: videoId,
-        playerVars: {
-          autoplay: 1,
-          loop: 1,
-          playlist: videoId, // Requerido por YouTube para el bucle continuo
-          controls: 0,
-          disablekb: 1,
-          fs: 0,
-          modestbranding: 1,
-          playsinline: 1,
-          rel: 0,
-          enablejsapi: 1,
-          origin: window.location.origin,
-        },
-        events: {
-          onReady: (event: any) => {
-            setIsPlayerReady(true);
-            try {
-              event.target.unMute();
-              event.target.setVolume(100); // Volumen al máximo (100%)
-              // Intentar reproducción automática inmediata
-              event.target.playVideo();
-            } catch (err) {
-              console.log('Autoplay inicial bloqueado por navegador hasta interacción:', err);
-            }
-          },
-          onStateChange: (event: any) => {
-            // 1: PLAYING, 2: PAUSED, 0: ENDED
-            if (event.data === window.YT.PlayerState.PLAYING) {
-              setIsPlaying(true);
-              setHasUserActivated(true);
-            } else if (event.data === window.YT.PlayerState.PAUSED) {
-              setIsPlaying(false);
-            } else if (event.data === window.YT.PlayerState.ENDED) {
-              // Bucle garantizado: volver al inicio y reiniciar
-              event.target.seekTo(0, true);
-              event.target.playVideo();
-            }
-          },
-        },
-      });
-    };
-
-    if (window.YT && window.YT.Player) {
-      initPlayer();
-    } else {
-      // Registrar callback global si aún no está cargado
-      window.onYouTubeIframeAPIReady = () => {
-        initPlayer();
-      };
-
-      // Inyectar el script oficial si no existe en el DOM
-      if (!document.getElementById('yt-iframe-api')) {
-        const tag = document.createElement('script');
-        tag.id = 'yt-iframe-api';
-        tag.src = 'https://www.youtube.com/iframe_api';
-        const firstScriptTag = document.getElementsByTagName('script')[0];
-        firstScriptTag?.parentNode?.insertBefore(tag, firstScriptTag);
-      }
+    if (audioRef.current) {
+      audioRef.current.volume = isMuted ? 0 : volume / 100;
+      audioRef.current.muted = isMuted;
     }
+  }, [volume, isMuted]);
 
-    return () => {
-      if (playerRef.current && playerRef.current.destroy) {
-        try {
-          playerRef.current.destroy();
-          playerRef.current = null;
-        } catch (e) {
-          // ignore cleanup error
-        }
-      }
-    };
-  }, []);
-
-  // Escuchar cualquier interacción en la ventana para desbloquear el audio al máximo si el navegador aplicó bloqueo de autoplay en frío
+  // Intentar reproducir automáticamente tan pronto el audio esté montado
   useEffect(() => {
-    const triggerAudio = () => {
-      if (playerRef.current && !isPlayingRef.current) {
-        try {
-          playerRef.current.unMute();
-          playerRef.current.setVolume(100);
-          playerRef.current.playVideo();
-          setIsPlaying(true);
-          setHasUserActivated(true);
-        } catch (e) {
-          // ignore
-        }
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    audio.volume = isMuted ? 0 : volume / 100;
+    audio.loop = true;
+
+    const playAudio = () => {
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            setIsPlaying(true);
+          })
+          .catch((err) => {
+            console.log('Autoplay inicial a la espera de interacción del usuario:', err);
+            setIsPlaying(false);
+          });
       }
     };
 
+    playAudio();
+
+    // Desbloquear en la primera interacción si el navegador requirió gesto del usuario
     const events = ['pointerdown', 'touchstart', 'mousedown', 'keydown', 'click'];
     const handleInteraction = () => {
-      triggerAudio();
+      if (audio.paused) {
+        audio.volume = isMuted ? 0 : volume / 100;
+        audio
+          .play()
+          .then(() => {
+            setIsPlaying(true);
+          })
+          .catch((err) => console.warn('Error al iniciar audio en interacción:', err));
+      }
       events.forEach((ev) => window.removeEventListener(ev, handleInteraction));
     };
 
@@ -158,106 +90,88 @@ export function BackgroundMusic({ onPlayStateChange }: BackgroundMusicProps) {
     };
   }, []);
 
-  // Reintentos automáticos tras estar listo por si el navegador tardó en responder
-  useEffect(() => {
-    if (!isPlayerReady) return;
-    let attempts = 0;
-    const timer = setInterval(() => {
-      attempts++;
-      if (playerRef.current && !isPlayingRef.current) {
-        try {
-          playerRef.current.unMute();
-          playerRef.current.setVolume(100);
-          playerRef.current.playVideo();
-        } catch (e) {
-          // ignore
-        }
-      }
-      if (attempts >= 5 || isPlayingRef.current) {
-        clearInterval(timer);
-      }
-    }, 700);
-
-    return () => clearInterval(timer);
-  }, [isPlayerReady]);
-
   // Alternar reproducción / pausa
   const togglePlay = () => {
-    if (!playerRef.current) return;
-    try {
-      if (isPlaying) {
-        playerRef.current.pauseVideo();
-        setIsPlaying(false);
-      } else {
-        playerRef.current.unMute();
-        playerRef.current.setVolume(volume);
-        playerRef.current.playVideo();
-        setIsPlaying(true);
-        setHasUserActivated(true);
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    if (!audio.paused) {
+      audio.pause();
+      setIsPlaying(false);
+    } else {
+      audio.volume = isMuted ? 0 : volume / 100;
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            setIsPlaying(true);
+          })
+          .catch((e) => {
+            console.warn('Error al reproducir audio:', e);
+            setIsPlaying(false);
+          });
       }
-    } catch (e) {
-      console.warn('Error al alternar reproducción', e);
     }
   };
 
   // Alternar silencio
   const toggleMute = () => {
-    if (!playerRef.current) return;
-    try {
-      if (isMuted) {
-        playerRef.current.unMute();
-        playerRef.current.setVolume(volume);
-        setIsMuted(false);
-      } else {
-        playerRef.current.mute();
-        setIsMuted(true);
-      }
-    } catch (e) {
-      console.warn('Error al alternar silencio', e);
+    const nextMuted = !isMuted;
+    setIsMuted(nextMuted);
+    if (audioRef.current) {
+      audioRef.current.muted = nextMuted;
+      audioRef.current.volume = nextMuted ? 0 : volume / 100;
     }
   };
 
   // Cambiar volumen
   const handleVolumeChange = (newVolume: number) => {
     setVolume(newVolume);
-    if (playerRef.current) {
-      try {
-        if (isMuted && newVolume > 0) {
-          playerRef.current.unMute();
-          setIsMuted(false);
-        }
-        playerRef.current.setVolume(newVolume);
-      } catch (e) {
-        console.warn('Error al cambiar volumen', e);
-      }
+    if (isMuted && newVolume > 0) {
+      setIsMuted(false);
+    }
+    if (audioRef.current) {
+      audioRef.current.volume = newVolume / 100;
+      audioRef.current.muted = false;
     }
   };
 
-  // Activación explícita si el navegador bloquea el autoplay inicial
+  // Activación explícita mediante el botón si el navegador pausó el inicio
   const handleActivateMusic = () => {
-    setHasUserActivated(true);
-    if (playerRef.current) {
-      try {
-        playerRef.current.unMute();
-        playerRef.current.setVolume(100);
-        playerRef.current.playVideo();
-        setIsPlaying(true);
-      } catch (e) {
-        console.warn('Error al activar música', e);
+    const audio = audioRef.current;
+    if (audio) {
+      audio.volume = isMuted ? 0 : volume / 100;
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            setIsPlaying(true);
+          })
+          .catch((e) => console.warn('Error al activar música:', e));
       }
     }
   };
 
   return (
     <>
-      {/* Contenedor IFrame de YouTube posicionado activamente sin activar culling de navegador */}
-      <div
-        id="youtube-audio-container"
-        className="fixed bottom-0 right-0 w-16 h-16 pointer-events-none opacity-[0.001] -z-50 overflow-hidden"
-        aria-hidden="true"
-      >
-        <div id="youtube-audio-player" />
-      </div>
+      {/* Elemento de audio HTML5 con el archivo descargado servido bajo BASE_URL */}
+      <audio
+        ref={audioRef}
+        id="native-audio-player"
+        src={AUDIO_URL}
+        preload="auto"
+        loop
+        playsInline
+        onPlay={() => setIsPlaying(true)}
+        onPause={() => setIsPlaying(false)}
+        onError={(e) => console.error('Error cargando audio desde', AUDIO_URL, e)}
+        onEnded={() => {
+          if (audioRef.current) {
+            audioRef.current.currentTime = 0;
+            audioRef.current.play().catch(() => {});
+          }
+        }}
+      />
 
       {/* Botón elegante de aviso si el navegador bloqueó el autoplay en frío */}
       {!isPlaying && (
