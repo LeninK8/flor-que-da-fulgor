@@ -6,7 +6,7 @@
 import { useState, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { Scene } from './scene/Scene';
-import { BackgroundMusic } from './components/BackgroundMusic';
+import { YouTubePlayer } from './components/YouTubePlayer';
 
 export default function App() {
   const [messageVisible, setMessageVisible] = useState(false);
@@ -24,12 +24,12 @@ export default function App() {
       id="app-root"
       className="relative w-screen h-screen overflow-hidden bg-[#0c0517] select-none font-sans text-slate-100"
     >
-      {/* 1. Control de Música Minimalista en la esquina superior derecha */}
+      {/* 1. Control de Música y Reproductor de YouTube en la esquina superior derecha */}
       <aside
         id="music-control-wrapper"
-        className="absolute top-4 right-4 z-20 flex items-center p-1 rounded-2xl backdrop-blur-xl bg-slate-950/40 border border-white/10 shadow-2xl hover:bg-slate-950/60 transition-colors"
+        className="absolute top-4 right-4 z-20"
       >
-        <BackgroundMusic />
+        <YouTubePlayer />
       </aside>
 
       {/* 2. Lienzo 3D en pantalla completa: Flor Completa Bioluminiscente en Noche Mágica */}
@@ -60,7 +60,7 @@ export default function App() {
         }`}
       >
         <p className="font-serif italic text-base sm:text-lg md:text-xl text-amber-100/90 tracking-wide leading-relaxed drop-shadow-[0_2px_16px_rgba(245,158,11,0.4)]">
-          “Flor que da fulgor, con tu brillo fiel...
+          “Tú eres mi sueño ideal
           <br />
           <span className="not-italic font-normal tracking-widest text-amber-200/95 block mt-1.5 text-sm sm:text-base md:text-lg drop-shadow-[0_2px_12px_rgba(245,158,11,0.35)]">
             Feliz 21 de septiembre”
